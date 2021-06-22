@@ -7,6 +7,7 @@
 #include <tuple>
 #include <cstdio>
 #include <cctype>
+#include <functional>
 
 using namespace std;
 
@@ -73,9 +74,7 @@ string outer_sort(uint64_t l, uint64_t r) {
     vector<uint32_t> borders;
     vector<ifstream> sources;
     vector<string> filenames;
-    vector<bool> opened(BLOCKS_PER_LAYER, true);
-    vector<uint32_t> indexes(BLOCKS_PER_LAYER);  
-    for (uint32_t i = 0; i < BLOCKS_PER_LAYER; i++) {
+    for (uint32_t i = 0; i <= BLOCKS_PER_LAYER; i++) {
         borders.push_back(l + (r - l) * i / BLOCKS_PER_LAYER);
         if (i > 0) {
             string source = outer_sort(borders[i - 1], borders[i]);
@@ -86,14 +85,16 @@ string outer_sort(uint64_t l, uint64_t r) {
             }
         }
     }
+
+    uint32_t real_bpl = sources.size();
     
-    vector<vector<string>> bufs(BLOCKS_PER_LAYER);
-    priority_queue<pair<string, int>> merge;
-    for (uint32_t i = 0; i < BLOCKS_PER_LAYER; i++) {
+    vector<bool> opened(real_bpl, true);
+    vector<vector<string>> bufs(real_bpl);
+    vector<uint32_t> indexes(real_bpl);
+    priority_queue<pair<string, int>, vector<pair<string, int>>, greater<pair<string, int>>> merge;
+    for (uint32_t i = 0; i < real_bpl; i++) {
         opened[i] = read_buf(bufs[i], sources[i]);
-        if (opened[i]) {
-            merge.push({bufs[i][indexes[i]++], i});
-        }
+        merge.push({bufs[i][indexes[i]++], i});
     }
 
     vector<string> res_buf;
@@ -108,11 +109,13 @@ string outer_sort(uint64_t l, uint64_t r) {
             tie(curr_s, curr_ind) = merge.top();
             merge.pop();
             res_buf.push_back(curr_s);
-            if (indexes[curr_ind] == bufs[curr_ind].size() && opened[curr_ind]) {
-                opened[curr_ind] = read_buf(bufs[curr_ind], sources[curr_ind]);
-                indexes[curr_ind] = 0;
-            } else if (!opened[curr_ind]) {
-                continue;
+            if (indexes[curr_ind] == bufs[curr_ind].size()) {
+                if (opened[curr_ind]) {
+                    opened[curr_ind] = read_buf(bufs[curr_ind], sources[curr_ind]);
+                    indexes[curr_ind] = 0;
+                } else {
+                    continue;
+                }
             }
             merge.push({bufs[curr_ind][indexes[curr_ind]++], curr_ind});
         }
