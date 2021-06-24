@@ -10,13 +10,15 @@
 #include <functional>
 #include <cerrno>
 #include <cstring>
+#include <ctime>
 
 using namespace std;
 
 // assume we have 4MB of RAM available for string storage
-constexpr const uint32_t RAM_BYTES = 4 * 1024 * 1024 * 0.95;
-constexpr const uint32_t BLOCK_BYTES = 8 * 1024;
-constexpr const uint32_t BLOCKS_PER_LAYER = RAM_BYTES / BLOCK_BYTES;
+constexpr const uint32_t RAM_BYTES = 500 * 1024 * 1024 * 0.95;
+//must be more than two
+uint32_t BLOCKS_PER_LAYER = 2;
+uint32_t BLOCK_BYTES = RAM_BYTES / BLOCKS_PER_LAYER;
 uint32_t BLOCKS = 0;
 // ofstream log("log.txt");
 
@@ -117,6 +119,7 @@ string outer_sort(uint64_t l, uint64_t r) {
             bytes += sizeof(merge.top().first) + merge.top().first.size();
             if (indexes[curr_ind] == bufs[curr_ind].size()) {
                 if (opened[curr_ind]) {
+                    bufs[curr_ind].clear();
                     opened[curr_ind] = read_buf(bufs[curr_ind], sources[curr_ind]);
                     indexes[curr_ind] = 0;
                 } else {
@@ -144,6 +147,7 @@ int main() {
     cout << "Hello! Enter the filename to sort.\n";
     string filename;
     cin >> filename;
+    double start = clock();
     if (!check_correct(filename)){
         cout << "Done.\n";
         return 0;
@@ -151,4 +155,6 @@ int main() {
     split_into_blocks(filename);
     rename(outer_sort(0, BLOCKS).c_str(), "result.txt");
     cout << "Done.\n";
+    cout << "On BPL=" << BLOCKS_PER_LAYER << " time is " << (clock() - start) / CLOCKS_PER_SEC; 
+    cout << '\n';
 }

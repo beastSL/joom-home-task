@@ -19,5 +19,5 @@ int main() {
             last = s;
         }
     }
-    cout << "Sort is succesful.";
+    cout << "Sort is succesful.\n";
 }
