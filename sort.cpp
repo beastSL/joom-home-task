@@ -15,9 +15,9 @@
 using namespace std;
 
 // assume we have 4MB of RAM available for string storage
-constexpr const uint32_t RAM_BYTES = 500 * 1024 * 1024 * 0.95;
+constexpr const uint32_t RAM_BYTES = 4 * 1024 * 1024 * 0.95;
 //must be more than two
-uint32_t BLOCKS_PER_LAYER = 2;
+uint32_t BLOCKS_PER_LAYER = 10;
 uint32_t BLOCK_BYTES = RAM_BYTES / BLOCKS_PER_LAYER;
 uint32_t BLOCKS = 0;
 // ofstream log("log.txt");
