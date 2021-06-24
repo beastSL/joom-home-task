@@ -8,14 +8,17 @@
 #include <cstdio>
 #include <cctype>
 #include <functional>
+#include <cerrno>
+#include <cstring>
 
 using namespace std;
 
-// assume we have 3GB of RAM available for string storage
-constexpr const uint32_t RAM_BYTES = 2.8 * 1024 * 1024 * 1024;
-constexpr const uint32_t BLOCK_BYTES = 1024 * 1024;
+// assume we have 4MB of RAM available for string storage
+constexpr const uint32_t RAM_BYTES = 4 * 1024 * 1024 * 0.95;
+constexpr const uint32_t BLOCK_BYTES = 8 * 1024;
 constexpr const uint32_t BLOCKS_PER_LAYER = RAM_BYTES / BLOCK_BYTES;
 uint32_t BLOCKS = 0;
+// ofstream log("log.txt");
 
 bool check_correct(const string& filename) {
     ifstream in(filename);
@@ -39,7 +42,7 @@ bool read_buf(vector<string>& buf, ifstream& in) {
         cur_bytes += sizeof(next_str) + next_str.size();
     }
 
-    in.seekg(-next_str.size(), ios_base::seekdir::_S_cur);
+    in.seekg(-(off_t)next_str.size(), ios::cur);
     return true;
 }
 
@@ -50,14 +53,15 @@ void write_buf(const vector<string>& buf, ofstream& out) {
 }
 
 void split_into_blocks(const string& filename) {
-    ifstream in(filename);
+    ifstream in(filename, ios::binary);
     bool flag_cont = true;
-    string next_str;
     while (flag_cont) {
         string cur_filename = "b" + to_string(BLOCKS++);
         vector<string> buf;
         ofstream out(cur_filename);
+        // log << cur_filename << '\n';
 
+        string str;
         flag_cont = read_buf(buf, in);
         sort(buf.begin(), buf.end());
         write_buf(buf, out);
@@ -79,7 +83,7 @@ string outer_sort(uint64_t l, uint64_t r) {
         if (i > 0) {
             string source = outer_sort(borders[i - 1], borders[i]);
             if (!source.empty()) {
-                ifstream in(source);
+                ifstream in(source, ios::binary);
                 sources.push_back(move(in));
                 filenames.push_back(source);
             }
@@ -99,6 +103,7 @@ string outer_sort(uint64_t l, uint64_t r) {
 
     vector<string> res_buf;
     string out_filename = to_string(l) + "-" + to_string(r);
+    // log << out_filename << '\n';
     ofstream out(out_filename);
     while (!merge.empty()) {
         uint32_t bytes = 0;
@@ -109,6 +114,7 @@ string outer_sort(uint64_t l, uint64_t r) {
             tie(curr_s, curr_ind) = merge.top();
             merge.pop();
             res_buf.push_back(curr_s);
+            bytes += sizeof(merge.top().first) + merge.top().first.size();
             if (indexes[curr_ind] == bufs[curr_ind].size()) {
                 if (opened[curr_ind]) {
                     opened[curr_ind] = read_buf(bufs[curr_ind], sources[curr_ind]);
@@ -123,8 +129,13 @@ string outer_sort(uint64_t l, uint64_t r) {
         res_buf.clear();
     }
 
-    for (auto &filename : filenames) {
-        remove(filename.c_str());
+    for (int i = 0; i < real_bpl; i++) {
+        sources[i].close();
+        int result = remove(filenames[i].c_str());
+        if (result) {
+            cout << strerror(errno);
+            exit(0);
+        }
     }
     return out_filename;
 }
@@ -139,4 +150,5 @@ int main() {
     }
     split_into_blocks(filename);
     rename(outer_sort(0, BLOCKS).c_str(), "result.txt");
+    cout << "Done.\n";
 }
