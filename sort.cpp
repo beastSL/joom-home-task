@@ -25,7 +25,7 @@ uint32_t BLOCKS = 0;
 
 class my_ifstream {
 private:
-    char buf[BLOCK_BYTES];
+    char* buf = (char *)malloc(BLOCK_BYTES);
 public:
     ifstream stream;
     my_ifstream() {}
@@ -37,11 +37,20 @@ public:
         stream = ifstream(filename, om);
         stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
     }
+
+    my_ifstream(my_ifstream&& other) {
+        stream = move(other.stream);
+        swap(buf, other.buf);
+    }
+
+    ~my_ifstream() {
+        free(buf);
+    }
 };
 
 class my_ofstream {
 private:
-    char buf[BLOCK_BYTES];
+    char *buf = (char *)malloc(BLOCK_BYTES);
 public:
     ofstream stream;
     my_ofstream() {}
@@ -52,6 +61,15 @@ public:
     my_ofstream(const string& filename, const ios::openmode om) {
         stream = ofstream(filename, om);
         stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }
+
+    my_ofstream(my_ofstream&& other) {
+        stream = move(other.stream);
+        swap(buf, other.buf);
+    }
+
+    ~my_ofstream() {
+        free(buf);
     }
 };
 
@@ -165,7 +183,7 @@ string outer_sort(uint64_t l, uint64_t r) {
         res_buf.clear();
     }
 
-    for (int i = 0; i < real_bpl; i++) {
+    for (uint32_t i = 0; i < real_bpl; i++) {
         sources[i].stream.close();
         int result = remove(filenames[i].c_str());
         if (result) {
