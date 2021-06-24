@@ -11,56 +11,89 @@
 #include <cerrno>
 #include <cstring>
 #include <ctime>
+#include <memory>
 
 using namespace std;
 
 // assume we have 4MB of RAM available for string storage
-constexpr const uint32_t RAM_BYTES = 500 * 1024 * 1024 * 0.95;
+constexpr const uint32_t RAM_BYTES = 4 * 1024 * 1024 * 0.95;
 //must be more than two
-uint32_t BLOCKS_PER_LAYER = 2;
-uint32_t BLOCK_BYTES = RAM_BYTES / BLOCKS_PER_LAYER;
+constexpr const uint32_t BLOCKS_PER_LAYER = 2;
+constexpr const uint32_t BLOCK_BYTES = RAM_BYTES / BLOCKS_PER_LAYER;
 uint32_t BLOCKS = 0;
 // ofstream log("log.txt");
 
+class my_ifstream {
+private:
+    char buf[BLOCK_BYTES];
+public:
+    ifstream stream;
+    my_ifstream() {}
+    my_ifstream(const string& filename) {
+        stream = ifstream(filename);
+        stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }
+    my_ifstream(const string& filename, ios::openmode om) {
+        stream = ifstream(filename, om);
+        stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }
+};
+
+class my_ofstream {
+private:
+    char buf[BLOCK_BYTES];
+public:
+    ofstream stream;
+    my_ofstream() {}
+    my_ofstream(const string& filename) {
+        stream = ofstream(filename);
+        stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }
+    my_ofstream(const string& filename, const ios::openmode om) {
+        stream = ofstream(filename, om);
+        stream.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    }
+};
+
 bool check_correct(const string& filename) {
-    ifstream in(filename);
-    return in && in.peek() != ifstream::traits_type::eof(); 
+    my_ifstream in(filename);
+    return in.stream && in.stream.peek() != ifstream::traits_type::eof(); 
 }
 
-bool read_buf(vector<string>& buf, ifstream& in) {
+bool read_buf(vector<string>& buf, my_ifstream& in) {
     uint32_t cur_bytes = 0;
     string next_str;
     while (cur_bytes <= BLOCK_BYTES) {
         if (!next_str.empty()) {
             buf.push_back(next_str);
         }
-        while (isspace(in.peek())) {
-            in.get();
+        while (isspace(in.stream.peek())) {
+            in.stream.get();
         }
-        if (in.peek() == EOF) {
+        if (in.stream.peek() == EOF) {
             return false;
         }
-        in >> next_str;
+        in.stream >> next_str;
         cur_bytes += sizeof(next_str) + next_str.size();
     }
 
-    in.seekg(-(off_t)next_str.size(), ios::cur);
+    in.stream.seekg(-(off_t)next_str.size(), ios::cur);
     return true;
 }
 
-void write_buf(const vector<string>& buf, ofstream& out) {
+void write_buf(const vector<string>& buf, my_ofstream& out) {
     for (auto &s : buf) {
-        out << s << '\n';
+        out.stream << s << '\n';
     }
 }
 
 void split_into_blocks(const string& filename) {
-    ifstream in(filename, ios::binary);
+    my_ifstream in(filename, ios::binary);
     bool flag_cont = true;
     while (flag_cont) {
         string cur_filename = "b" + to_string(BLOCKS++);
         vector<string> buf;
-        ofstream out(cur_filename);
+        my_ofstream out(cur_filename);
         // log << cur_filename << '\n';
 
         string str;
@@ -78,14 +111,14 @@ string outer_sort(uint64_t l, uint64_t r) {
         return "b" + to_string(l);
     }
     vector<uint32_t> borders;
-    vector<ifstream> sources;
+    vector<my_ifstream> sources;
     vector<string> filenames;
     for (uint32_t i = 0; i <= BLOCKS_PER_LAYER; i++) {
         borders.push_back(l + (r - l) * i / BLOCKS_PER_LAYER);
         if (i > 0) {
             string source = outer_sort(borders[i - 1], borders[i]);
             if (!source.empty()) {
-                ifstream in(source, ios::binary);
+                my_ifstream in(source, ios::binary);
                 sources.push_back(move(in));
                 filenames.push_back(source);
             }
@@ -106,7 +139,7 @@ string outer_sort(uint64_t l, uint64_t r) {
     vector<string> res_buf;
     string out_filename = to_string(l) + "-" + to_string(r);
     // log << out_filename << '\n';
-    ofstream out(out_filename);
+    my_ofstream out(out_filename);
     while (!merge.empty()) {
         uint32_t bytes = 0;
         while (!merge.empty() && 
@@ -133,7 +166,7 @@ string outer_sort(uint64_t l, uint64_t r) {
     }
 
     for (int i = 0; i < real_bpl; i++) {
-        sources[i].close();
+        sources[i].stream.close();
         int result = remove(filenames[i].c_str());
         if (result) {
             cout << strerror(errno);
@@ -147,6 +180,8 @@ int main() {
     cout << "Hello! Enter the filename to sort.\n";
     string filename;
     cin >> filename;
+    cout << "Parameters:\nRAM_BYTES = " << RAM_BYTES << ", BLOCK_BYTES = " << BLOCK_BYTES ;
+    cout << ", BLOCKS_PER_LAYER = " << BLOCKS_PER_LAYER << endl;
     double start = clock();
     if (!check_correct(filename)){
         cout << "Done.\n";
